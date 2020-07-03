@@ -4,7 +4,7 @@ from math import ceil
 from Start import load_obj, Course
 import datetime
 import pickle
-import Upload
+# import Upload
 
 
 class Edit_init(QWidget):

@@ -57,4 +57,4 @@ def main(action, events={}):
             time.sleep(1)
             num += 1
 
-main("Clear")
+# main("Clear")
