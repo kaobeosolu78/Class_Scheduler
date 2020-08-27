@@ -67,10 +67,7 @@ class Course:
         while ind != len(self.exam_date_ranges):
             for chap in list(self.chapter_info.keys()):
                 if ind == self.chapter_info[chap][0]:
-                    try:
-                        self.exam_info[ind]
-                    except:
-                        self.exam_info[ind] = [("Total Pages", 0)]
+                    self.exam_info.get(ind, [("Total Pages", 0)])
                     self.exam_info[ind][0] = ("Total Pages", self.exam_info[ind][0][1] + self.chapter_info[chap][3][1])
             ind += 1
 
@@ -95,10 +92,7 @@ class Course:
         count = 0
         chaps = list(self.chapter_info.keys())
         for chap in chaps:
-            try:
-                self.calendar[self.chapter_info[chap][0]]
-            except:
-                self.calendar[self.chapter_info[chap][0]] = {}
+            self.calendar.get(self.chapter_info[chap][0], {})
             self.calendar[self.chapter_info[chap][0]][chap] = []
             while count != self.chapter_info[chap][4][1]:
                 self.calendar[self.chapter_info[chap][0]][chap].append(temp.pop(0))
@@ -111,6 +105,7 @@ class Course:
     def display(self):
         Upload.main("Add" ,self)
 
+    print()
     # pickle out calendar
     def finalize(self):
         calendars = load_obj("calendars")
