@@ -60,70 +60,62 @@ class Edit_init(MainWindow):
     def continu(self):
         item = self.lb.currentItem().text()
         self.close()
-        Set_Classes(self.raw_data[item], True)
+        SetClasses(self.raw_data[item], True)
 
 
-class Set_Classes(MainWindow):
-    def __init__(self, data = {"Class Name":"", "Exam Number":"", "Rest Days":"", "Exam Dates":[], "Chapter Number":"", "Chapters":{}}, edit = False):
-        self.data = data
+class SetClasses(MainWindow):
+    def __init__(self, class_data = {"Class Name":"", "Exam Number":"", "Rest Days":"", "Exam Dates":[], "Chapter Number":"", "Chapters":{}}, edit = False):
+        self.class_data = class_data
         self.edit = edit
 
         super().__init__()
-        self.initUI()
+        self.add_labels()
+        self.add_inputs()
+        self.add_buttons()
         self.finish("Schedule")
 
-    def initUI(self):
-        # labels
-        self.grid.addWidget(QLabel("Class Name: "), 0, 0)
+    def add_labels(self):
+        [self.grid.addWidget(QLabel(label_name), label_ind, 0) for label_ind, label_name in enumerate(["Class Name: ",
+                                                                                         "Number of Exams: ",
+                                                                                         "Rest Days after Exam: "])]
 
-        self.grid.addWidget(QLabel("Number of Exams: "), 1, 0)
+    def add_inputs(self):
+        for input_ind, input_name in enumerate(["Class Name", "Exam Number", "Rest Days"]):
+            self.class_data[input_name] = QLineEdit(self.class_data[input_name])
+            self.grid.addWidget(self.class_data[input_name], input_ind, 1)
 
-        self.grid.addWidget(QLabel("Rest Days after Exam: "), 2, 0)
-
-
-        # forms
-        self.class_name = QLineEdit(self.data["Class Name"])
-        self.grid.addWidget(self.class_name, 0, 1)
-
-        self.exam_num = QLineEdit(str(self.data["Exam Number"]))
-        self.grid.addWidget(self.exam_num, 1, 1)
-
-        self.rest_days = QLineEdit(str(self.data["Rest Days"]))
-        self.grid.addWidget(self.rest_days, 2, 1)
-
-        # buttons
+    def add_buttons(self):  # var, getattr, coord
         submit = QPushButton("Submit")
-        submit.clicked.connect(lambda: self.next())
+        submit.clicked.connect(lambda: self.submit())
         self.grid.addWidget(submit, 3, 0)
 
-        # delete
         if self.edit:
             delete = QPushButton("Delete")
             delete.clicked.connect(lambda: self.delete())
             self.grid.addWidget(delete, 3, 1)
 
-
-    def next(self):
+    def submit(self): # fix up
+        self.class_data["Class Name"] = self.class_data["Class Name"].text()
+        self.class_data["Exam Number"] = int(self.class_data["Exam Number"].text())  # implement custom error message
+        self.class_data["Rest Days"] = int(self.class_data["Rest Days"].text())
         self.close()
-        self.data["Class Name"] = self.class_name.text()
-        self.data["Exam Number"] = int(self.exam_num.text())
-        self.data["Rest Days"] = int(self.rest_days.text())
-        self.next = Set_Exams(self.data)
+        self.next = Set_Exams(self.class_data)
 
     def delete(self):
         self.close()
 
         cal = load_obj("calendars")
-        del cal[self.data["Class Name"]]
+        del cal[self.class_data["Class Name"]]
         pick_out = open("calendars.pkl", "wb")
         pickle.dump(cal, pick_out, pickle.HIGHEST_PROTOCOL)
         pick_out.close()
 
         raw = load_obj("raw_data")
-        del raw[self.data["Class Name"]]
+        del raw[self.class_data["Class Name"]]
         pick_out = open("raw_data.pkl", "wb")
         pickle.dump(raw, pick_out, pickle.HIGHEST_PROTOCOL)
         pick_out.close()
+
 
 class Set_Exams(MainWindow):
     def __init__(self, data):#class_name, exam_num):
@@ -178,9 +170,9 @@ class Set_Chapters(MainWindow):
         count2 = 0
         count3 = 0
         self.temp = []
-        for k in range(0, self.data["Exam Number"]*2, 2): # exam num
-            count2 += 1
-            grid.addWidget(QLabel("Exam {}".format(count2)), 0, k+1)
+        for exam_index, k in enumerate(range(0, self.data["Exam Number"]*2, 2)): # exam num
+            exam_index += 1
+            self.grid.addWidget(QLabel("Exam {}".format(exam_index)), 0, k+1)
             for j in range(1, 3*ceil(self.data["Chapter Number"]/self.data["Exam Number"])+1):
                 count += 1
                 if count == 1:
@@ -202,12 +194,6 @@ class Set_Chapters(MainWindow):
         submit = QPushButton("Submit")
         submit.clicked.connect(lambda: self.save())
         self.grid.addWidget(submit, j+1, k)
-
-        # general settings
-        self.setLayout(grid)
-        self.setGeometry(300,300,250,150)
-        self.setWindowTitle('Schedule')
-        self.show()
 
     def save(self):
         self.close()
@@ -235,16 +221,16 @@ class Home_Screen(MainWindow):
 
         super().__init__()
         self.initUI()
+        self.finish("Schedule")
 
     def initUI(self):
         # labels
-        grid.addWidget(QLabel("Upcoming\nItems..."), 0, 0)
+        self.grid.addWidget(QLabel("Upcoming\nItems..."), 0, 0)
 
         temp = {}
         count1 = 1
         for clas in list(self.calendars.keys()):
-            title = QLabel("-----"+clas+"-----")
-            grid.addWidget(title,1,count1)
+            self.grid.addWidget(QLabel("-----"+clas+"-----"),1,count1)
             temp[clas] = {}
             count2 = 0
             for exam in list(self.calendars[clas].keys()):
@@ -252,10 +238,8 @@ class Home_Screen(MainWindow):
                 for chap in list(self.calendars[clas][exam].keys()):
                     for date in self.calendars[clas][exam][chap]:
                         if date >= datetime.date.today() and count2 != 5:
-                            title = QLabel(str(date.month)+"/"+str(date.day)+"/"+str(date.year)+":")
-                            grid.addWidget(title, count2+2, count1-1)
-                            title = QLabel(chap+"        ")
-                            grid.addWidget(title, count2+2, count1)
+                            self.grid.addWidget(QLabel(str(date.month)+"/"+str(date.day)+"/"+str(date.year)+":"), count2+2, count1-1)
+                            self.grid.addWidget(QLabel(chap+"        "), count2+2, count1)
                             count2 += 1
             count1 += 2
 
@@ -271,29 +255,19 @@ class Home_Screen(MainWindow):
         edit.triggered.connect(lambda: self.editClass())
         filemenu.addAction(edit)
 
-        # general settings
-        wid.setLayout(grid)
-        self.setGeometry(300,300,250,150)
-        self.setWindowTitle('Schedule')
-        self.show()
-
     def newClass(self):
-        self.next = Set_Classes()
+        self.next = SetClasses()
 
     def editClass(self):
         self.next = Edit_init(self.raw_data)
 
     def check_past_exam(self):
         passed_exams = {}
-        count = -1
         for class_ in list(self.raw_data.keys()):
             passed_exams[class_] = []
-            for exam in self.raw_data[class_]["Exam Dates"]:
-                count += 1
+            for ind,exam in enumerate(self.raw_data[class_]["Exam Dates"]):
                 if datetime.datetime.today() > exam+datetime.timedelta(days=7):
-                    passed_exams[class_].append((exam,count))
-
-print()
+                    passed_exams[class_].append((exam,ind))
 
 
 def main():
