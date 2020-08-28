@@ -64,9 +64,10 @@ class Edit_init(MainWindow):
 
 
 class SetClasses(MainWindow):
-    def __init__(self, class_data = {"Class Name":"", "Exam Number":"", "Rest Days":"", "Exam Dates":[], "Chapter Number":"", "Chapters":{}}, edit = False):
+    def __init__(self, class_data={"Class Name":"", "Exam Number":"", "Rest Days":"", "Exam Dates":[],
+                                   "Chapter Number":"", "Chapters":{}}, editing=False):
         self.class_data = class_data
-        self.edit = edit
+        self.editing = editing
 
         super().__init__()
         self.add_labels()
@@ -81,7 +82,7 @@ class SetClasses(MainWindow):
 
     def add_inputs(self):
         for input_ind, input_name in enumerate(["Class Name", "Exam Number", "Rest Days"]):
-            self.class_data[input_name] = QLineEdit(self.class_data[input_name])
+            self.class_data[input_name] = QLineEdit(str(self.class_data[input_name]))
             self.grid.addWidget(self.class_data[input_name], input_ind, 1)
 
     def add_buttons(self):  # var, getattr, coord
@@ -89,7 +90,7 @@ class SetClasses(MainWindow):
         submit.clicked.connect(lambda: self.submit())
         self.grid.addWidget(submit, 3, 0)
 
-        if self.edit:
+        if self.editing:
             delete = QPushButton("Delete")
             delete.clicked.connect(lambda: self.delete())
             self.grid.addWidget(delete, 3, 1)
@@ -99,7 +100,7 @@ class SetClasses(MainWindow):
         self.class_data["Exam Number"] = int(self.class_data["Exam Number"].text())  # implement custom error message
         self.class_data["Rest Days"] = int(self.class_data["Rest Days"].text())
         self.close()
-        self.next = Set_Exams(self.class_data)
+        self.next = SetExams(self.class_data, self.editing)
 
     def delete(self):
         self.close()
@@ -117,80 +118,89 @@ class SetClasses(MainWindow):
         pick_out.close()
 
 
-class Set_Exams(MainWindow):
-    def __init__(self, data):#class_name, exam_num):
-        self.data = data
+class SetExams(MainWindow):
+    def __init__(self, class_data, editing=False):#class_name, exam_num):
+        self.class_data = class_data
+        self.editing = editing
 
         super().__init__()
-        self.initUI()
+        self.add_labels()
+        self.add_inputs()
         self.finish("Schedule")
+        self.add_buttons()
 
-    def initUI(self):
-        # input
-        self.grid.addWidget(QLabel("Start Date: "), 0, 2)
-        self.grid.addWidget(QLabel("Number of Chapters: "), 1, 2)
-        self.grid.addWidget(QLabel("Example Date Format: 1/20/2020"), 2, 2)
-        # self.data["Exam Dates"]
-        temp = [QLineEdit(self.data["Exam Dates"][0].strftime("%m/%d/%Y"))]
-        temp[0].setFixedWidth(87)
-        self.grid.addWidget(temp[0], 0, 3)
-        self.data["Chapter Number"] = QLineEdit(str(self.data["Chapter Number"]))
-        self.grid.addWidget(self.data["Chapter Number"], 1, 3)
+    def add_labels(self):
+        [self.grid.addWidget(QLabel(label_name), label_ind, 2) for label_ind, label_name in enumerate(["Start Date: ",
+                                                                                         "Number of Chapters: ",
+                                                                                         "Example Date Format: 1/20/2020"])]
 
-        for k in range(self.data["Exam Number"]):
-            self.grid.addWidget(QLabel("Exam {} Date: ".format(k+1)), k, 0)
-            form = QLineEdit(self.data["Exam Dates"][k].strftime("%m/%d/%Y"))
-            form.setFixedWidth(87)
-            self.grid.addWidget(form, k, 1)
-            temp.append(form)
-        self.data["Exam Dates"] = temp
+    def add_inputs(self):
+        if not self.editing:  # add error for empty
+            date_temp = ["" for k in range(self.class_data["Exam Number"])]
+        else:
+            date_temp = [self.class_data["Exam Dates"][k].strftime("%m/%d/%Y") if k < len(self.class_data["Exam Dates"])
+                         else "" for k in range(self.class_data["Exam Number"])]  # add window destructor
+        self.class_data["Exam Dates"] = self.class_data["Exam Dates"][:len(date_temp)]  # improve
 
-        # buttons
+        self.class_data["Chapter Number"] = QLineEdit(str(self.class_data["Chapter Number"]))
+        self.grid.addWidget(self.class_data["Chapter Number"], 1, 3)
+        for date_ind, date in enumerate(date_temp):
+            self.grid.addWidget(QLabel(f"Exam {date_ind+1} Date: "), date_ind, 0)
+            try:
+                self.class_data["Exam Dates"][date_ind] = QLineEdit(date)
+            except:
+                self.class_data["Exam Dates"].append(QLineEdit(date))
+
+            (self.grid.addWidget(self.class_data["Exam Dates"][date_ind], date_ind, 1),
+             self.class_data["Exam Dates"][date_ind].setFixedWidth(87))
+
+    def add_buttons(self):
         submit = QPushButton("Submit")
-        submit.clicked.connect(lambda: self.next())
-        self.grid.addWidget(submit, self.data["Exam Number"]+1, 0)
+        submit.clicked.connect(lambda: self.submit())
+        self.grid.addWidget(submit, self.class_data["Exam Number"]+1, 0)
 
-    def next(self):
+    def submit(self):
+        self.class_data["Exam Dates"] = [datetime.datetime.strptime(date.text(), "%m/%d/%Y")
+                                   for date in self.class_data["Exam Dates"]]
+        self.class_data["Chapter Number"] = int(self.class_data["Chapter Number"].text())
         self.close()
-        self.data["Exam Dates"] = [datetime.datetime.strptime(date.text(),"%m/%d/%Y") for date in self.data["Exam Dates"]]
-        self.data["Chapter Number"] = int(self.data["Chapter Number"].text())
-        self.next = Set_Chapters(self.data)
+        self.next = Set_Chapters(self.class_data)
 
 
 class Set_Chapters(MainWindow):
-    def __init__(self, data):
-        self.data = data
+    def __init__(self, class_data):
+        self.class_data = class_data
 
         super().__init__()
         self.initUI()
+        self.add_buttons()
 
     def initUI(self):
         # input
         count = 0
-        count2 = 0
         count3 = 0
         self.temp = []
-        for exam_index, k in enumerate(range(0, self.data["Exam Number"]*2, 2)): # exam num
+        for exam_index, k in enumerate(range(0, self.class_data["Exam Number"]*2, 2)): # exam num
             exam_index += 1
             self.grid.addWidget(QLabel("Exam {}".format(exam_index)), 0, k+1)
-            for j in range(1, 3*ceil(self.data["Chapter Number"]/self.data["Exam Number"])+1):
+            for j in range(1, 3*ceil(self.class_data["Chapter Number"]/self.class_data["Exam Number"])+1):
                 count += 1
                 if count == 1:
                     count3 += 1
                     title = QLabel("Chapter {} Name: ".format(count3))
-                    entry = QLineEdit(list(self.data["Chapters"].keys())[count3-1])
+                    entry = QLineEdit(list(self.class_data["Chapters"].keys())[count3-1])
                 if count == 2:
                     title = QLabel("Start Page: ")
-                    entry = QLineEdit(str(self.data["Chapters"][list(self.data["Chapters"].keys())[count3-1]][1]))
+                    entry = QLineEdit(str(self.class_data["Chapters"][list(self.class_data["Chapters"].keys())[count3-1]][1]))
                 if count == 3:
                     count = 0
                     title = QLabel("End Page: ")
-                    entry = QLineEdit(str(self.data["Chapters"][list(self.data["Chapters"].keys())[count3-1]][2]))
+                    entry = QLineEdit(str(self.class_data["Chapters"][list(self.class_data["Chapters"].keys())[count3-1]][2]))
                 self.grid.addWidget(title, j, k)
                 self.temp.append(entry)
                 self.grid.addWidget(entry, j, k+1)
 
-        # buttons
+    def add_buttons(self):
         submit = QPushButton("Submit")
         submit.clicked.connect(lambda: self.save())
         self.grid.addWidget(submit, j+1, k)
@@ -198,16 +208,16 @@ class Set_Chapters(MainWindow):
     def save(self):
         self.close()
         exam = 0
-        self.data["Chapters"] = {}
+        self.class_data["Chapters"] = {}
         for k in range(0, len(self.temp), 3):
-            if k != 0 and k % (3*ceil(self.data["Chapter Number"]/self.data["Exam Number"])) == 0:
+            if k != 0 and k % (3*ceil(self.class_data["Chapter Number"]/self.class_data["Exam Number"])) == 0:
                 exam += 1
-            self.data["Chapters"][self.temp[k].text()] = [exam, int(self.temp[k+1].text()), int(self.temp[k+2].text())]
+            self.class_data["Chapters"][self.temp[k].text()] = [exam, int(self.temp[k+1].text()), int(self.temp[k+2].text())]
 
-        course = Course(self.data["Class Name"],self.data["Exam Dates"],self.data["Chapters"],self.data["Rest Days"])
+        course = Course(self.class_data["Class Name"],self.class_data["Exam Dates"],self.class_data["Chapters"],self.class_data["Rest Days"])
 
         rd = load_obj("raw_data")
-        rd[self.data["Class Name"]] = self.data
+        rd[self.class_data["Class Name"]] = self.class_data
         pick_out = open("raw_data.pkl", "wb")
         pickle.dump(rd, pick_out, pickle.HIGHEST_PROTOCOL)
         pick_out.close()
