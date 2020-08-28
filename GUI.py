@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QApplication, QGridLayout, QFormLayout, QLineEdit, QPushButton, QMainWindow, QAction, QListWidget
 import sys
 from math import ceil
-from Start import load_obj, Course
+from Start import load_obj, save_obj, Course
 import datetime
 import pickle
 import Upload
@@ -33,6 +33,20 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(title)
         self.show()
 
+    def add_buttons(self, name, coords):
+        button = QPushButton(name.title())
+        button.clicked.connect(lambda: getattr(self, name)())
+        self.grid.addWidget(button, coords[0], coords[1])
+
+    def add_menus(self, names):
+        menubar = self.menuBar()
+        filemenu = menubar.addMenu("File")
+
+        for name in names:
+            menu = QAction(name.title(), self)
+            menu.triggered.connect(lambda: getattr(self, name)())
+            filemenu.addAction(menu)
+
 
 class Edit_init(MainWindow):
     def __init__(self, rd):
@@ -53,11 +67,11 @@ class Edit_init(MainWindow):
         for k in range(len(list(self.raw_data.keys()))):
             self.lb.insertItem(k, list(self.raw_data.keys())[k])
 
-        self.lb.clicked.connect(self.continu)
+        self.lb.clicked.connect(self.next)  # rename
         self.grid.addWidget(self.lb,1,0)
 
 
-    def continu(self):
+    def next(self):
         item = self.lb.currentItem().text()
         self.close()
         SetClasses(self.raw_data[item], True)
@@ -72,7 +86,9 @@ class SetClasses(MainWindow):
         super().__init__()
         self.add_labels()
         self.add_inputs()
-        self.add_buttons()
+        self.add_buttons("submit", (3, 0))
+        if self.editing:
+            self.add_buttons("delete", (3, 1))
         self.finish("Schedule")
 
     def add_labels(self):
@@ -84,16 +100,6 @@ class SetClasses(MainWindow):
         for input_ind, input_name in enumerate(["Class Name", "Exam Number", "Rest Days"]):
             self.class_data[input_name] = QLineEdit(str(self.class_data[input_name]))
             self.grid.addWidget(self.class_data[input_name], input_ind, 1)
-
-    def add_buttons(self):  # var, getattr, coord
-        submit = QPushButton("Submit")
-        submit.clicked.connect(lambda: self.submit())
-        self.grid.addWidget(submit, 3, 0)
-
-        if self.editing:
-            delete = QPushButton("Delete")
-            delete.clicked.connect(lambda: self.delete())
-            self.grid.addWidget(delete, 3, 1)
 
     def submit(self): # fix up
         self.class_data["Class Name"] = self.class_data["Class Name"].text()
@@ -107,15 +113,11 @@ class SetClasses(MainWindow):
 
         cal = load_obj("calendars")
         del cal[self.class_data["Class Name"]]
-        pick_out = open("calendars.pkl", "wb")
-        pickle.dump(cal, pick_out, pickle.HIGHEST_PROTOCOL)
-        pick_out.close()
+        save_obj("calendars", cal)
 
         raw = load_obj("raw_data")
         del raw[self.class_data["Class Name"]]
-        pick_out = open("raw_data.pkl", "wb")
-        pickle.dump(raw, pick_out, pickle.HIGHEST_PROTOCOL)
-        pick_out.close()
+        save_obj("raw_data", raw)
 
 
 class SetExams(MainWindow):
@@ -126,8 +128,8 @@ class SetExams(MainWindow):
         super().__init__()
         self.add_labels()
         self.add_inputs()
+        self.add_buttons("submit", (self.class_data["Exam Number"]+1, 0))
         self.finish("Schedule")
-        self.add_buttons()
 
     def add_labels(self):
         [self.grid.addWidget(QLabel(label_name), label_ind, 2) for label_ind, label_name in enumerate(["Start Date: ",
@@ -154,11 +156,6 @@ class SetExams(MainWindow):
             (self.grid.addWidget(self.class_data["Exam Dates"][date_ind], date_ind, 1),
              self.class_data["Exam Dates"][date_ind].setFixedWidth(87))
 
-    def add_buttons(self):
-        submit = QPushButton("Submit")
-        submit.clicked.connect(lambda: self.submit())
-        self.grid.addWidget(submit, self.class_data["Exam Number"]+1, 0)
-
     def submit(self):
         self.class_data["Exam Dates"] = [datetime.datetime.strptime(date.text(), "%m/%d/%Y")
                                    for date in self.class_data["Exam Dates"]]
@@ -173,10 +170,14 @@ class Set_Chapters(MainWindow):
 
         super().__init__()
         self.initUI()
-        self.add_buttons()
+        self.finish("Schedule")
 
     def initUI(self):
         # input
+
+
+
+
         count = 0
         count3 = 0
         self.temp = []
@@ -200,10 +201,9 @@ class Set_Chapters(MainWindow):
                 self.temp.append(entry)
                 self.grid.addWidget(entry, j, k+1)
 
-    def add_buttons(self):
-        submit = QPushButton("Submit")
-        submit.clicked.connect(lambda: self.save())
-        self.grid.addWidget(submit, j+1, k)
+                submit = QPushButton("Submit")
+                submit.clicked.connect(lambda: self.save())
+                self.grid.addWidget(submit, j+1, k)
 
     def save(self):
         self.close()
@@ -218,9 +218,7 @@ class Set_Chapters(MainWindow):
 
         rd = load_obj("raw_data")
         rd[self.class_data["Class Name"]] = self.class_data
-        pick_out = open("raw_data.pkl", "wb")
-        pickle.dump(rd, pick_out, pickle.HIGHEST_PROTOCOL)
-        pick_out.close()
+        save_obj("raw_data", rd)
 
 class Home_Screen(MainWindow):
     def __init__(self):
@@ -232,9 +230,10 @@ class Home_Screen(MainWindow):
         super().__init__()
         self.initUI()
         self.finish("Schedule")
+        self.add_menus(["new", "edit"])
 
     def initUI(self):
-        # labels
+        # labelsedit
         self.grid.addWidget(QLabel("Upcoming\nItems..."), 0, 0)
 
         temp = {}
@@ -253,22 +252,10 @@ class Home_Screen(MainWindow):
                             count2 += 1
             count1 += 2
 
-        # menus
-        menubar = self.menuBar()
-        filemenu = menubar.addMenu("File")
-
-        new = QAction("New Class", self)
-        new.triggered.connect(lambda: self.newClass())
-        filemenu.addAction(new)
-
-        edit = QAction("Edit Class", self)
-        edit.triggered.connect(lambda: self.editClass())
-        filemenu.addAction(edit)
-
-    def newClass(self):
+    def new(self):
         self.next = SetClasses()
 
-    def editClass(self):
+    def edit(self):
         self.next = Edit_init(self.raw_data)
 
     def check_past_exam(self):

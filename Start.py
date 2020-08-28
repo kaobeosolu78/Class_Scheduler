@@ -15,6 +15,11 @@ def load_obj(datatype):
     with open("{}".format(datatype) + '.pkl', 'rb') as f:
         return pickle.load(f)
 
+# saves pickled object
+def save_obj(name, data):
+    pick_out = open(f"{name}.pkl", "wb")
+    pickle.dump(data, pick_out, pickle.HIGHEST_PROTOCOL)
+    pick_out.close()
 
 class Course:
     def __init__(self, name, exam_dates, chapters, cooldown):
