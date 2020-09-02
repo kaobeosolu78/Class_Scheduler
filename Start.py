@@ -21,64 +21,72 @@ def save_obj(name, data):
     pickle.dump(data, pick_out, pickle.HIGHEST_PROTOCOL)
     pick_out.close()
 
+class Chapter:
+    def __init__(self, chapter, chapter_info):
+        self.chapter_name = chapter
+        self.exam_number, self.start_page, self.end_page = chapter_info
+
+    def get_page_sum(self):
+        return self.end_page-self.start_page
+
+
 class Course:
-    def __init__(self, name, exam_dates, chapters, cooldown):
+    def __init__(self, name, start_date, exam_dates, chapters, cooldown):
         # initialize vars
         self.name = name
+        self.start_date = start_date
         self.exam_dates = exam_dates
-        self.chapter_info = chapters
+        self.chapter_info = {name: Chapter(name, info) for name,info in list(chapters.items())}
         self.cooldown = cooldown
-        self.exam_info = {}
+        self.exam_info = tuple({"Date Range": []} for _ in self.exam_dates)
         self.total_page_num = 0
-        self.exam_date_ranges = []
-        self.all_dates = date_range(self.exam_dates[0], self.exam_dates[len(self.exam_dates)-1])
+        self.exams = []
+        self.all_dates = date_range(self.exam_dates[0], self.exam_dates[-1])
         self.calendar = {}
 
         # call necessary methods
-        self.get_page_nums()
-        self.get_dates()
-        self.adj_dates()
+        self.get_exam_date_ranges()
+        self.adjust_dates()
+        self.total_pages_to_study()
         self.add_pages()
-        self.calc_urgency()
-        self.set_dates()
-        self.finalize()
-        self.display()
+        # self.calc_urgency()
+        # self.set_dates()
+        # self.finalize()
+        # self.display()
 
-    # gets difference of input pages to find page num for each chapter
-    def get_page_nums(self):
-        for chap in list(self.chapter_info.keys()):
-            self.chapter_info[chap].append(("Number of Pages", self.chapter_info[chap][2]-self.chapter_info[chap][1]))
-            # also gets total number of pages
-            self.total_page_num += self.chapter_info[chap][2]-self.chapter_info[chap][1]
 
     # creates a list of datetimes between each exam
-    def get_dates(self):
-        for k in range(len(self.exam_dates)-1):
-            self.exam_date_ranges.append((date_range(self.exam_dates[k], self.exam_dates[k+1])))
+    def get_exam_date_ranges(self):
+        for exam_date_ind, exam in enumerate(self.exam_info):
+            exam["Date Range"].append((date_range(([self.start_date]+self.exam_dates)[exam_date_ind],
+                                                  ([self.start_date]+self.exam_dates)[exam_date_ind+1])))
 
     # removes the exam date from all date ranges and a variable number of dates after the exam
-    def adj_dates(self):
-        for k in range(self.cooldown):
-            for date_ in [ex+datetime.timedelta(days=k) for ex in self.exam_dates[1:]]:
-                if date_ in self.all_dates:
-                    del self.all_dates[self.all_dates.index(date_)]
-                for j in range(len(self.exam_date_ranges)):
-                    if date_ in self.exam_date_ranges[j]:
-                        del self.exam_date_ranges[j][self.exam_date_ranges[j].index(date_)]
+    def adjust_dates(self):
+        for remove_date in [exam_date+datetime.timedelta(days=days_after_exam)
+                      for exam_date in self.exam_dates[1:] for days_after_exam in range(3)]:
+            if remove_date in self.all_dates:
+                del self.all_dates[self.all_dates.index(remove_date)]
+            for exam in self.exam_info:
+                if remove_date in exam["Date Range"]:
+                    del exam["Date Range"][self.exam_date_ranges[ind].index(remove_date)]
+
+    def total_pages_to_study(self):
+        self.total_page_num = sum([chapter_obj.get_page_sum() for chapter_obj in list(self.chapter_info.values())])
 
     # calculate total pages per exam
     def add_pages(self):
-        ind = 0
-        while ind != len(self.exam_date_ranges):
-            for chap in list(self.chapter_info.keys()):
-                if ind == self.chapter_info[chap][0]:
-                    self.exam_info.get(ind, [("Total Pages", 0)])
-                    self.exam_info[ind][0] = ("Total Pages", self.exam_info[ind][0][1] + self.chapter_info[chap][3][1])
-            ind += 1
+        for exam_number, exam in enumerate(self.exam_info):
+            for chapter_name, chapter in list(self.chapter_info.items()):
+                if chapter.exam_number == exam_number:
+                    exam["Total Pages"] = exam.get("Total Pages", 0) + chapter.get_page_sum()
 
-    # for each chapter, create a ratio [(pages in chapter/pages requred for exam)*(total dates)] that will be used to
+    # for each chapter, create a ratio [(pages in chapter/pages required for exam)*(total dates)] that will be used to
     # calculate how many days each chapter should be studied
     def calc_urgency(self):
+
+
+
         test, temp = 0, ""
         for ind in range(len(self.exam_date_ranges)):
             for chap in list(self.chapter_info.keys()):
@@ -110,19 +118,17 @@ class Course:
     def display(self):
         Upload.main("Add" ,self)
 
-    print()
     # pickle out calendar
     def finalize(self):
         calendars = load_obj("calendars")
         calendars[self.name] = self.calendar
-        pick_out = open("calendars.pkl", "wb")
-        pickle.dump(calendars, pick_out, pickle.HIGHEST_PROTOCOL)
-        pick_out.close()
+        save_obj("calendars", calendars)
+
 
 def main():
-    # test = Course("Physics", [datetime.date(2020,6,29),datetime.date(2020,6,4),datetime.date(2020,7,7),datetime.date(2020,7,28),datetime.date(2020,8,11)], {"Electrostatics":[0,651,675], "Electric Fields" : [0,676,708], "Electric Potential" : [0,709,736], "Capacitors" : [0,737,764], "Current and Resistance" : [1,765,794], "Direct Current" : [1,795,818], "Magnetism" : [1,819,844], "Magnetic Fields" : [1,845,874], "Electromagnetic Induction" : [1,875,906], "EM Oscillations" : [2,907,938], "Electromagnetic Waves" : [2,939,970], "Geometric Optics" : [2,971,1002], "Special Relativity" : [3,1072,1107]}, 2)
-    test = Course("Orgo", [datetime.date(2020,6,30),datetime.date(2020,7,28)], {"Alcohols":[0,10,40], "Ketones":[0,41,73], "Aromatics":[0,74,102]}, 2)
-    print(test.calendar)
+    test = Course("Physics", datetime.date(2020,5,9), [datetime.date(2020,6,4),datetime.date(2020,7,7),datetime.date(2020,7,28),datetime.date(2020,8,11)], {"Electrostatics":[0,651,675], "Electric Fields" : [0,676,708], "Electric Potential" : [0,709,736], "Capacitors" : [0,737,764], "Current and Resistance" : [1,765,794], "Direct Current" : [1,795,818], "Magnetism" : [1,819,844], "Magnetic Fields" : [1,845,874], "Electromagnetic Induction" : [1,875,906], "EM Oscillations" : [2,907,938], "Electromagnetic Waves" : [2,939,970], "Geometric Optics" : [2,971,1002], "Special Relativity" : [3,1072,1107]}, 2)
+    # test = Course("Orgo", [datetime.date(2020,6,30),datetime.date(2020,7,28)], {"Alcohols":[0,10,40], "Ketones":[0,41,73], "Aromatics":[0,74,102]}, 2)
+    # print(test.calendar)
 
 if __name__ == "__main__":
     main()
