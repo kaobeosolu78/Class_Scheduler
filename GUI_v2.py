@@ -74,20 +74,9 @@ class GuiLayout(QMainWindow):
         self.master.right_grid.addWidget(self.__dict__[f"{current_type}_list"], 0, 0)
 
 class GuiFunctions(GuiLayout):
-    def __init__(self, master, params):# fix
+    def __init__(self, master):# fix
         super().__init__(master)
 
-
-        # self.inputs = [QLineEdit() for temp in range(params["input number"])]
-        #
-        # self.add_layouts(params["parent grid"])#params["layout size"])
-        # self.add_labels(params["label names"])
-        # self.add_inputs()
-        # self.add_button(params["button1 name"], params["button1 coords"], "left_grid")  # add loop
-        # self.add_button(params["button2 name"], params["button2 coords"], "left_grid")
-        # self.add_button(params["button3 name"], params["button3 coords"], "right_grid")
-        # self.add_listbox()
-        # self.add_menus(["clear"])
 
     # helper funcs
     def add_to_listbox(self, word, current_type):
@@ -133,7 +122,7 @@ class Home_Screen(GuiFunctions):
         # self.check_past_exam()
 
         self.initUI()
-        self.finish("Schedule")
+        self.display("Schedule")
         self.add_menus(["new"])  # , "edit"])
 
     def initUI(self):
@@ -173,15 +162,12 @@ class Home_Screen(GuiFunctions):
 
 class AddCourses(GuiFunctions):
     def __init__(self, master):
-        super().__init__(master, {"input number": 2, "layout size": 129, "label names": ["Course Name:", "Exam Number:"],
-                          "button1 name": "add", "button1 coords": (2, 0), "button2 name": "delete",
-                          "button2 coords": (2, 1), "button3 name": "next", "button3 coords": (1, 0), "parent grid":
-                          "course_grid"})
+        super().__init__(master)
 
-        self.course_input = [QLineEdit() for temp in range(2)]
+        self.course_input = [QLineEdit() for _ in range(2)]
 
         self.add_layouts("course_grid", 100)
-        self.add_labels(["Course Name:", "Exam Number:"])
+        self.add_labels(["Course \nName:", "Exam \nNumber:"])
         self.add_inputs("course")
         self.add_button("add", (2, 0), "left_grid", "course")  # add loop
         self.add_button("delete", (2, 1), "left_grid", "course")
@@ -190,7 +176,6 @@ class AddCourses(GuiFunctions):
     def store_info(self):
         course_info = super().store_info("course")
         self.master.stored_info[course_info[0]] = CourseSchedule(course_info[0], course_info[1])  # add error dialog or descriptor
-        # self.master.stored_info[course_info[0]] = {}
 
     def load_info(self):
         self.set_input_text(self.master.stored_info[self.master.get_current_selection("course")].course_loadable(), "course")
@@ -208,10 +193,7 @@ class AddCourses(GuiFunctions):
 class AddDates(GuiFunctions):
 
     def __init__(self, master):
-        super().__init__(master, {"input number": 2, "layout size": 129, "label names": ["Course Name:", "Exam Number:"],
-                          "button1 name": "add", "button1 coords": (2, 0), "button2 name": "delete",
-                          "button2 coords": (2, 1), "button3 name": "next", "button3 coords": (1, 0)})
-
+        super().__init__(master)
 
         self.date_input = [QLineEdit()]
         self.not_so_current_selection = []
@@ -240,15 +222,12 @@ class AddDates(GuiFunctions):
 class AddChapters(GuiFunctions):
 
     def __init__(self, master):
-        super().__init__(master, {"input number": 4, "layout size": 52, "label names": ["Chapter Name:", "Exam Number:",
-                          "Start Page:", "Stop Page"], "button1 name": "add", "button1 coords": (4, 0),
-                          "button2 name": "delete", "button2 coords": (4, 1), "button3 name": "done",
-                          "button3 coords": (1, 0), "listbox grid": "right_grid", "parent grid": "chapter_grid"})
+        super().__init__(master)
 
-        self.chapter_input = [QLineEdit() for temp in range(3)]
+        self.chapter_input = [QLineEdit() for _ in range(3)]
 
         self.add_layouts("chapter_grid", 27)
-        self.add_labels(["Chapter Name:", "Start Page:", "Stop Page"])
+        self.add_labels(["Chapter \nName:", "Start Page:", "Stop Page"])
         self.add_inputs("chapter")
         self.add_button("add", (4, 0), "left_grid", "chapter")  # add loop
         self.add_button("delete", (4, 1), "left_grid", "chapter")
@@ -266,8 +245,12 @@ class AddChapters(GuiFunctions):
                 self.master.get_current_selection("chapter")), "chapter")
 
     def delete(self, *args):
-        del self.master.stored_info[self.master.get_current_selection("course")].chapters[self.master.get_current_selection("chapter")] # add error dialog for no selection
+        del self.master.stored_info[self.master.get_current_selection("course")].chapters[self.master.get_current_selection("chapter")]  # add error dialog for no selection
         super().delete(["chapter"])
+
+    def submit(self, current_type):
+        print()
+        pass
 
 
 class Master(QMainWindow):
@@ -275,7 +258,6 @@ class Master(QMainWindow):
         super().__init__()
         self.add_window()
         self.add_all_layouts()
-        self.temp = 0
 
         self.stored_info = {}
         self.course = AddCourses(self)
@@ -296,19 +278,6 @@ class Master(QMainWindow):
 
     def get_current_selection(self, current_type): # solve course_list mystery
         return attrgetter(f"{current_type}.{current_type}_list")(self).currentItem().text()
-
-    # def save_list(self, current_type):
-    #     temp = self.chapter.chapter_list.count()
-    #     if self.temp != self.course.not_so_current_index:
-    #         previous_course_selection = self.course.not_so_current_selection[self.course.not_so_current_index-1]
-    #     else:
-    #         previous_course_selection = self.get_current_selection("course")
-    #     for date in range(self.date.date_list.count()):
-    #         self.stored_info[previous_course_selection].list_data[self.date.date_list.takeItem(0).text()] = \
-    #             [self.chapter.chapter_list.takeItem(0).text() for item in range(temp)]
-    #     self.load_list(current_type)
-        # self.temp = self.course.not_so_current_index
-        # print(self.course.not_so_current_selection[self.course.not_so_current_index-1], self.stored_info[self.course.not_so_current_selection[self.course.not_so_current_index-1]].list_data)
 
     def save_list(self, course_switch=False):
         if not course_switch:
@@ -353,10 +322,3 @@ def main():
 
 main()
 
-# previous_course_selection = self.get_current_selection("course")
-# if len(self.course.not_so_current_selection) == 2:
-#     previous_course_selection = self.course.not_so_current_selection.pop(0)
-#     for date in range(self.date.date_list.count()):
-#         self.stored_info[previous_course_selection].list_data[self.date.date_list.takeItem(0).text()] = \
-#             [self.chapter.chapter_list.takeItem(0).text() for item in range(self.chapter.chapter_list.count())]
-# self.load_list(current_type, previous_course_selection)

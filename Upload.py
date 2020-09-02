@@ -47,7 +47,7 @@ def main(action, calendar, exam_dates):
                     time.sleep(1)
 
         for exam_num, date in enumerate(exam_dates):
-            created_event = service.events().quickAdd(
+            service.events().quickAdd(
                 calendarId='primary',
                 text=f"Exam {exam_num+1=} on {date=}").execute()
             time.sleep(1)
