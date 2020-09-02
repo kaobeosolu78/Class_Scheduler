@@ -10,7 +10,7 @@ from google.auth.transport.requests import Request
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 
-def main(action, events={}):
+def main(action, calendar, exam_dates):
     """Shows basic usage of the Google Calendar API.
     Prints the start and name of the next 10 events on the user's calendar.
     """
@@ -38,22 +38,16 @@ def main(action, events={}):
         service.calendars().clear(calendarId='primary').execute()
 
     if action == "Add":
-        for exam in list(events.calendar.keys()):
-            for chapter in list(events.calendar[exam].keys()):
-                print(chapter)
-                for date in events.calendar[exam][chapter]:
-                    created_event = service.events().quickAdd(
+        for exam in calendar:
+            for chapter, dates in list(exam.items()):
+                for date in dates:
+                    service.events().quickAdd(
                         calendarId='primary',
-                        text="{} on {}".format(chapter,str(date.year)+"-"+str(date.month)+"-"+str(date.day))).execute()
-
+                        text=f"{chapter} on {date=}").execute()
                     time.sleep(1)
-        num = 1
-        for date in events.exam_dates[1:]:
+
+        for exam_num, date in enumerate(exam_dates):
             created_event = service.events().quickAdd(
                 calendarId='primary',
-                text="Exam {} on {}".format(num, str(date.year) + "-" + str(date.month) + "-" + str(date.day))).execute()
-
+                text=f"Exam {exam_num+1=} on {date=}").execute()
             time.sleep(1)
-            num += 1
-
-# main("Clear")

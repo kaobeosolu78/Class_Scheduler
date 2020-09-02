@@ -2,7 +2,7 @@ import __init__
 import os, sys
 sys.path.insert(0, os.path.abspath("."))
 import datetime
-# import Upload
+import Upload
 import pickle
 
 # gets a range of datetime vals from start->end
@@ -42,21 +42,24 @@ class Course:
         self.chapter_info = {name: Chapter(name, info) for name,info in list(chapters.items())}
         self.cooldown = cooldown
         self.exam_info = tuple({"Date Range": []} for _ in self.exam_dates)
-        self.total_page_num = 0
-        self.exams = []
-        self.all_dates = date_range(self.exam_dates[0], self.exam_dates[-1])
-        self.calendar = {}
+        self.all_dates = date_range(self.start_date, self.exam_dates[-1])
+        def calendar_generator(exam_num):
+            for chapter_name, chapter in list(self.chapter_info.items()) :
+                if chapter.exam_number == exam_num:
+                    yield chapter_name
 
-        self.finalize()
+        self.calendar = tuple({chapter: [] for chapter in calendar_generator(exam_num)} for exam_num in range(len(exam_dates)))
+        # one liner for lines 46-52
+        # self.calendar = tuple({chapter: [] for chapter in (chapter_name for chapter_name, chapter in list(self.chapter_info.items()) if chapter.exam_number == exam_num)} for exam_num in range(len(exam_dates)))
+
         # call necessary methods
         self.get_exam_date_ranges()
         self.adjust_dates()
-        self.total_pages_to_study()
         self.add_pages()
         self.calculate_urgency()
-        # self.set_dates()
-        # self.finalize()
-        # self.display()
+        self.set_dates()
+        self.finalize()
+        self.display()
 
 
     # creates a list of datetimes between each exam
@@ -75,9 +78,6 @@ class Course:
                 if remove_date in exam["Date Range"]:
                     del exam["Date Range"][exam["Date Range"].index(remove_date)]
 
-    def total_pages_to_study(self):
-        self.total_page_num = sum([chapter_obj.get_page_sum() for chapter_obj in list(self.chapter_info.values())])
-
     # calculate total pages per exam
     def add_pages(self):
         for exam_number, exam in enumerate(self.exam_info):
@@ -95,7 +95,7 @@ class Course:
                     chapter.calculate_urgency(exam["Total Pages"], len(exam["Date Range"]))
                     test += chapter.urgency
             #         temp = len(exam["Date Range"])
-            # print(test, temp) May have to add edge case
+            # print(test, temp) # May have to add edge case
 
 
         # test, temp = 0, ""
@@ -112,38 +112,30 @@ class Course:
 
     # create a calendar and portion out the chapters
     def set_dates(self):
-        # calendar = {Class_Name: {Exam_Num:{Chapter_Name:[List_of_Study_Dates]}}
+        date_total_index = 0
+        for chapter in list(self.chapter_info.values()):
+            for day in range(chapter.urgency):
+                self.calendar[chapter.exam_number][chapter.chapter_name].append(self.all_dates[date_total_index])
+                date_total_index += 1
 
-
-        temp = self.all_dates
-        count = 0
-        chaps = list(self.chapter_info.keys())
-        for chap in chaps:
-            self.calendar.get(self.chapter_info[chap][0], {})
-            self.calendar[self.chapter_info[chap][0]][chap] = []
-            while count != self.chapter_info[chap][4][1]:
-                self.calendar[self.chapter_info[chap][0]][chap].append(temp.pop(0))
-                count+=1
-            if temp != [] and chaps.index(chap) != len(chaps) and self.chapter_info[chap][0] != self.chapter_info[chaps[chaps.index(chap)+1]][0] and temp[0] < self.exam_dates[self.chapter_info[chap][0]+1]:
-                self.calendar[self.chapter_info[chap][0]][chap].append(temp.pop(0))
-            count = 0
 
     # add cal to google calendar
     def display(self):
-        Upload.main("Add" ,self)
+        Upload.main("Add", self.calendar, self.exam_dates)
+
 
     # pickle out calendar
     def finalize(self):
         calendars = load_obj("calendars")
         print("")
         # calendars[self.name] = self.calendar
-        # save_obj("calendars", calendars)
+        # save_obj("calendar", calendars)
 
 
 def main():
     test = Course("Physics", datetime.date(2020,5,9), [datetime.date(2020,6,4),datetime.date(2020,7,7),datetime.date(2020,7,28),datetime.date(2020,8,11)], {"Electrostatics":[0,651,675], "Electric Fields" : [0,676,708], "Electric Potential" : [0,709,736], "Capacitors" : [0,737,764], "Current and Resistance" : [1,765,794], "Direct Current" : [1,795,818], "Magnetism" : [1,819,844], "Magnetic Fields" : [1,845,874], "Electromagnetic Induction" : [1,875,906], "EM Oscillations" : [2,907,938], "Electromagnetic Waves" : [2,939,970], "Geometric Optics" : [2,971,1002], "Special Relativity" : [3,1072,1107]}, 2)
     # test = Course("Orgo", [datetime.date(2020,6,30),datetime.date(2020,7,28)], {"Alcohols":[0,10,40], "Ketones":[0,41,73], "Aromatics":[0,74,102]}, 2)
-    # print(test.calendar)
+    print(test.calendar)
 
 if __name__ == "__main__":
     main()
