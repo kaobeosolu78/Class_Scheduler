@@ -1,7 +1,9 @@
-from PyQt5.QtWidgets import QWidget, QLabel, QApplication, QGridLayout, QFormLayout, QLineEdit, QPushButton, QMainWindow, QAction, QListWidget
+from PyQt5.QtWidgets import QWidget, QLabel, QApplication, QGridLayout, QFormLayout, QLineEdit, \
+    QPushButton, QMainWindow, QAction, QListWidget, QErrorMessage
 from Start import load_obj, save_obj, Course
 import datetime
 from operator import attrgetter
+from PyQt5 import QtCore, QtWidgets
 import sys
 import abc
 import time
@@ -10,17 +12,30 @@ import time
 # check out viability of descriptor implementation in some vars
 # implement current_type = self.__class__.__name__[3:-1].lower()
 # relearn args+kwargs
+# yield from
+
+
+def datetime_conversion(date_str):  # maybe add date list instead of manual input
+    for month_format in ["%m", "%-m", "%B", "%b"]:  # also maybe remove seps and replace with /
+        for day_format in ["%d", "%-d"]:
+            for year_format in ["%y", "%Y", "%-y"]:
+                for sep_format_1, sep_format_2 in zip([" ", "/", "-", " "],[", ", "/", "-", " "]):
+                    try:
+                        return datetime.datetime.strptime(date_str, f"{month_format}{sep_format_1}{day_format}{sep_format_2}{year_format}")
+                    except:
+                        pass
 
 
 class CourseSchedule:
-    def __init__(self, course_name, exam_number):
+    def __init__(self, course_name, cooldown, start_page):
         self.course_name = course_name
-        self.exam_number = exam_number  # get rid of this
+        self.cooldown = cooldown  # get rid of this
+        self.start_page = start_page
         self.exam_dates = []
         self.chapters = {}
 
     def course_loadable(self):
-        return [self.course_name, self.exam_number]
+        return [self.course_name, self.cooldown, self.start_page]
 
     def chapter_loadable(self, chapter_name):
         return [chapter_name] + self.chapters[chapter_name][1:]
@@ -39,20 +54,13 @@ class GuiLayout(QMainWindow):
     def __init__(self, master):
         super().__init__()
         self.master = master
+        self.error = QtWidgets.QErrorMessage(self)
+        self.error.setWindowModality(QtCore.Qt.WindowModal)
 
     def add_button(self, name, coords, layout, current_type):
         button = QPushButton(name.title())
         button.clicked.connect(lambda: getattr(self, name)(current_type))
         self.master.__dict__[layout].addWidget(button, coords[0], coords[1])
-
-    def add_menus(self, names):
-        menubar = self.menuBar()
-        filemenu = menubar.addMenu("File")
-
-        for name in names:
-            menu = QAction(name.title(), self)
-            menu.triggered.connect(lambda: getattr(self, name)())
-            filemenu.addAction(menu)
 
     def add_layouts(self, parent_grid, grid_spacing):  # add nother' param
         for layout_ind, layout_name in enumerate(["left_grid", "right_grid"]):
@@ -111,45 +119,68 @@ class GuiFunctions(GuiLayout):
             current_list.clear()
 
 
-class Home_Screen(GuiFunctions):
-    def __init__(self, master):
-        super().__init__(master)
+class Home_Screen(QMainWindow):
+    def __init__(self):
+        super().__init__(None)
+        self.window = QWidget(self)
+        self.setCentralWidget(self.window)
+
+        self.grid = QGridLayout()
+        self.calendar = load_obj("calendar")
+
+        self.add_labels()
+        self.display("Test")
+        print()
+
+    def add_menu(self):
+        menubar = self.menuBar()
+        filemenu = menubar.addMenu("File")
+
+        menu = QAction("Edit Courses", self)
+        menu.triggered.connect(lambda: self.edit_info())
+        filemenu.addAction(menu)
+
+    def add_labels(self):
+        for course_ind, course_name in enumerate(["Physics"]):
+            chapter_ind = 0
+            label = QLabel(f"----{course_name}----")
+            label.setAlignment(QtCore.Qt.AlignCenter)
+            self.grid.addWidget(label, 0, course_ind)
+            chapters, exams = self.get_active_info(self.calendar)
+            for chapter_name, dates in list(chapters.items()):
+                chapter_ind += 1
+                label = QLabel(chapter_name)
+                label.setAlignment(QtCore.Qt.AlignCenter)
+                self.grid.addWidget(label, chapter_ind, course_ind)
+                for date in dates:
+                    chapter_ind += 1
+                    label = QLabel(str(f"{date}"))
+                    label.setAlignment(QtCore.Qt.AlignCenter)
+                    self.grid.addWidget(label, chapter_ind, course_ind)
+
+    def get_active_info(self, course_calendar):
+        lookahead = 0
+        current_chapters = {}
+        current_exams = []
+        for exam_number, exam in enumerate(list(course_calendar)):
+            for chapter_name, chapter in list(exam.items()):
+                for date_ind in range(len(chapter)):
+                    if datetime.date(2020, 5, 20) <= chapter[date_ind]:
+                        if exam_number not in current_exams: current_exams.append(exam_number)
+                        current_chapters[chapter_name] = current_chapters.get(chapter_name, []) + [chapter[date_ind]]
+                        lookahead += 1
+                        if lookahead == 5:
+                            return (current_chapters, current_exams)
+
+    def edit_info(self):
+        pass
 
 
-        self.calendars = load_obj("calendars")
-        self.raw_data = load_obj("raw_data")
-
-        # self.check_past_exam()
-
-        self.initUI()
-        self.display("Schedule")
-        self.add_menus(["new"])  # , "edit"])
-
-    def initUI(self):
-        # labelsedit
-        self.grid.addWidget(QLabel("Upcoming\nItems..."), 0, 0)
-
-        temp = {}
-        count1 = 1
-        for clas in list(self.calendars.keys()):
-            self.grid.addWidget(QLabel("-----"+clas+"-----"),1,count1)
-            temp[clas] = {}
-            count2 = 0
-            for exam in list(self.calendars[clas].keys()):
-                if count2 == 5: break
-                for chap in list(self.calendars[clas][exam].keys()):
-                    for date in self.calendars[clas][exam][chap]:
-                        if date >= datetime.date.today() and count2 != 5:
-                            self.grid.addWidget(QLabel(str(date.month)+"/"+str(date.day)+"/"+str(date.year)+":"), count2+2, count1-1)
-                            self.grid.addWidget(QLabel(chap+"        "), count2+2, count1)
-                            count2 += 1
-            count1 += 2
-
-    def new(self):
-        self.next = SetClasses()
-    #
-    # def edit(self):
-    #     self.next = Edit_init(self.raw_data)
+    def display(self, title, x_dim=500, y_dim=400):
+        self.window.setLayout(self.grid)
+        self.setGeometry(1300, 300, x_dim, y_dim)
+        self.setWindowTitle(title)
+        self.show()
 
     # def check_past_exam(self):
     #     passed_exams = {}
@@ -160,22 +191,24 @@ class Home_Screen(GuiFunctions):
     #                 passed_exams[class_].append((exam,ind))
 
 
+
+
 class AddCourses(GuiFunctions):
     def __init__(self, master):
         super().__init__(master)
 
-        self.course_input = [QLineEdit() for _ in range(2)]
+        self.course_input = [QLineEdit() for _ in range(3)]
 
-        self.add_layouts("course_grid", 100)
-        self.add_labels(["Course \nName:", "Exam \nNumber:"])
+        self.add_layouts("course_grid", 50)
+        self.add_labels(["Course \nName:", "Rest Days \nAfter Exam:", "Start Page:"])
         self.add_inputs("course")
-        self.add_button("add", (2, 0), "left_grid", "course")  # add loop
-        self.add_button("delete", (2, 1), "left_grid", "course")
+        self.add_button("add", (3, 0), "left_grid", "course")  # add loop
+        self.add_button("delete", (3, 1), "left_grid", "course")
         self.add_listbox("course")
 
     def store_info(self):
         course_info = super().store_info("course")
-        self.master.stored_info[course_info[0]] = CourseSchedule(course_info[0], course_info[1])  # add error dialog or descriptor
+        self.master.stored_info[course_info[0]] = CourseSchedule(course_info[0], course_info[1], course_info[2])  # add error dialog or descriptor
 
     def load_info(self):
         self.set_input_text(self.master.stored_info[self.master.get_current_selection("course")].course_loadable(), "course")
@@ -185,10 +218,6 @@ class AddCourses(GuiFunctions):
         del self.master.stored_info[self.master.get_current_selection("course")]
         super().delete(["course", "date", "chapter"])
 
-
-    # test = Course("Physics", [datetime.date(2020,6,29),datetime.date(2020,6,4),datetime.date(2020,7,7),
-    # datetime.date(2020,7,28),datetime.date(2020,8,11)], {"Electrostatics":[0,651,675],
-    # "Electric Fields" : [0,676,708], "Electric Potential" : [0,709,736], "Capacitors" : [0,737,764], "Current and Resistance" : [1,765,794], "Direct Current" : [1,795,818], "Magnetism" : [1,819,844], "Magnetic Fields" : [1,845,874], "Electromagnetic Induction" : [1,875,906], "EM Oscillations" : [2,907,938], "Electromagnetic Waves" : [2,939,970], "Geometric Optics" : [2,971,1002], "Special Relativity" : [3,1072,1107]}, 2)
 
 class AddDates(GuiFunctions):
 
@@ -227,7 +256,7 @@ class AddChapters(GuiFunctions):
         self.chapter_input = [QLineEdit() for _ in range(3)]
 
         self.add_layouts("chapter_grid", 27)
-        self.add_labels(["Chapter \nName:", "Start Page:", "Stop Page"])
+        self.add_labels(["Chapter \nName:", "First Page:", "Last Page"])
         self.add_inputs("chapter")
         self.add_button("add", (4, 0), "left_grid", "chapter")  # add loop
         self.add_button("delete", (4, 1), "left_grid", "chapter")
@@ -249,8 +278,9 @@ class AddChapters(GuiFunctions):
         super().delete(["chapter"])
 
     def submit(self, current_type):
-        print()
-        pass
+        for course, sched in list(self.master.stored_info.items()):
+            Course(course, datetime_conversion(sched.start_page), [datetime_conversion(date) for date in sched.exam_dates],
+                  {name: [int(val) for val in info] for name, info in sched.chapters.items()}, int(sched.cooldown))
 
 
 class Master(QMainWindow):
@@ -263,7 +293,7 @@ class Master(QMainWindow):
         self.course = AddCourses(self)
         self.date = AddDates(self)
         self.chapter = AddChapters(self)
-        self.display("test")
+        self.display("Schedule")
 
 
     def add_window(self):
@@ -321,4 +351,6 @@ def main():
     sys.exit(app.exec_())
 
 main()
+
+
 

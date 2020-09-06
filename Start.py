@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.abspath("."))
 import datetime
 import Upload
 import pickle
+# current chapter and current page
 
 # gets a range of datetime vals from start->end
 def date_range(start, end):
@@ -34,15 +35,17 @@ class Chapter:
         self.urgency = round((self.get_page_sum()/exam_page_sum)*date_range_length)
 
 class Course:
-    def __init__(self, name, start_date, exam_dates, chapters, cooldown):
+    def __init__(self, name, start_page, exam_dates, chapters, cooldown, start_date=datetime.date.today()):
         # initialize vars
         self.name = name
-        self.start_date = start_date
+        self.start_date = start_date  # datetime.date.today()
+        self.start_page = start_page
         self.exam_dates = exam_dates
-        self.chapter_info = {name: Chapter(name, info) for name,info in list(chapters.items())}
+        self.chapter_info = {name: Chapter(name, info) for name, info in list(chapters.items()) if not info[2] < self.start_page}
         self.cooldown = cooldown
         self.exam_info = tuple({"Date Range": []} for _ in self.exam_dates)
         self.all_dates = date_range(self.start_date, self.exam_dates[-1])
+
         def calendar_generator(exam_num):
             for chapter_name, chapter in list(self.chapter_info.items()) :
                 if chapter.exam_number == exam_num:
@@ -59,8 +62,8 @@ class Course:
         self.calculate_urgency()
         self.set_dates()
         self.finalize()
-        self.display()
-
+        # self.display()
+        print()
 
     # creates a list of datetimes between each exam
     def get_exam_date_ranges(self):
@@ -71,31 +74,33 @@ class Course:
     # removes the exam date from all date ranges and a variable number of dates after the exam
     def adjust_dates(self):  # improve
         for remove_date in [exam_date+datetime.timedelta(days=days_after_exam)
-                for exam_date in self.exam_dates[1:] for days_after_exam in range(3)]:
-            if remove_date in self.all_dates:
-                del self.all_dates[self.all_dates.index(remove_date)]
+                for exam_date in self.exam_dates[1:] for days_after_exam in range(self.cooldown)]:
+            for date in self.all_dates:
+                if remove_date == date or date < self.start_date:
+                    # if remove_date in self.all_dates:
+                    del self.all_dates[self.all_dates.index(date)]
             for exam in self.exam_info:
-                if remove_date in exam["Date Range"]:
-                    del exam["Date Range"][exam["Date Range"].index(remove_date)]
+                for date in exam["Date Range"]:
+                    if remove_date == date or date < self.start_date:
+                        del exam["Date Range"][exam["Date Range"].index(date)]
+
+    def adjust_chapters(self):
+        pass
 
     # calculate total pages per exam
     def add_pages(self):
         for exam_number, exam in enumerate(self.exam_info):
             for chapter_name, chapter in list(self.chapter_info.items()):
                 if chapter.exam_number == exam_number:
-                    exam["Total Pages"] = exam.get("Total Pages", 0) + chapter.get_page_sum()
+                    exam["Total Pages"] = exam.get("Total Pages", 0) + chapter.get_page_sum()  # combine two loops
 
     # for each chapter, create a ratio [(pages in chapter/pages required for exam)*(total dates)] that will be used to
     # calculate how many days each chapter should be studied
     def calculate_urgency(self):
         for exam_number, exam in enumerate(self.exam_info):
-            test = 0
             for chapter in list(self.chapter_info.values()):
                 if chapter.exam_number == exam_number:
                     chapter.calculate_urgency(exam["Total Pages"], len(exam["Date Range"]))
-                    test += chapter.urgency
-            #         temp = len(exam["Date Range"])
-            # print(test, temp) # May have to add edge case
 
 
         # test, temp = 0, ""
@@ -114,10 +119,12 @@ class Course:
     def set_dates(self):
         date_total_index = 0
         for chapter in list(self.chapter_info.values()):
-            for day in range(chapter.urgency):
-                self.calendar[chapter.exam_number][chapter.chapter_name].append(self.all_dates[date_total_index])
+            pages = ()
+            for day_ind, day in enumerate(range(chapter.urgency)):
+                pages = (int(chapter.start_page+(day_ind)*(chapter.get_page_sum()/chapter.urgency)),
+                          int(chapter.start_page+(day_ind+1)*(chapter.get_page_sum()/chapter.urgency)))
+                self.calendar[chapter.exam_number][chapter.chapter_name].append((self.all_dates[date_total_index], pages))
                 date_total_index += 1
-
 
     # add cal to google calendar
     def display(self):
@@ -126,14 +133,14 @@ class Course:
 
     # pickle out calendar
     def finalize(self):
-        calendars = load_obj("calendars")
+        # calendars = load_obj("calendars")
         print("")
         # calendars[self.name] = self.calendar
-        # save_obj("calendar", calendars)
+        save_obj("calendar", self.calendar)
 
 
 def main():
-    test = Course("Physics", datetime.date(2020,5,9), [datetime.date(2020,6,4),datetime.date(2020,7,7),datetime.date(2020,7,28),datetime.date(2020,8,11)], {"Electrostatics":[0,651,675], "Electric Fields" : [0,676,708], "Electric Potential" : [0,709,736], "Capacitors" : [0,737,764], "Current and Resistance" : [1,765,794], "Direct Current" : [1,795,818], "Magnetism" : [1,819,844], "Magnetic Fields" : [1,845,874], "Electromagnetic Induction" : [1,875,906], "EM Oscillations" : [2,907,938], "Electromagnetic Waves" : [2,939,970], "Geometric Optics" : [2,971,1002], "Special Relativity" : [3,1072,1107]}, 2)
+    test = Course("Physics", 750, [datetime.date(2020,6,4),datetime.date(2020,7,7),datetime.date(2020,7,28),datetime.date(2020,8,11)], {"Electrostatics":[0,651,675], "Electric Fields" : [0,676,708], "Electric Potential" : [0,709,736], "Capacitors" : [0,737,764], "Current and Resistance" : [1,765,794], "Direct Current" : [1,795,818], "Magnetism" : [1,819,844], "Magnetic Fields" : [1,845,874], "Electromagnetic Induction" : [1,875,906], "EM Oscillations" : [2,907,938], "Electromagnetic Waves" : [2,939,970], "Geometric Optics" : [2,971,1002], "Special Relativity" : [3,1072,1107]}, 2, datetime.date(2020, 5, 25))
     # test = Course("Orgo", [datetime.date(2020,6,30),datetime.date(2020,7,28)], {"Alcohols":[0,10,40], "Ketones":[0,41,73], "Aromatics":[0,74,102]}, 2)
     print(test.calendar)
 

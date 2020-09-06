@@ -34,20 +34,22 @@ def main(action, calendar, exam_dates):
             pickle.dump(creds, token)
 
     service = build('calendar', 'v3', credentials=creds)
-    if action == "Clear":
+    if action == "clear":
         service.calendars().clear(calendarId='primary').execute()
 
-    if action == "Add":
+    if action == "add":
         for exam in calendar:
-            for chapter, dates in list(exam.items()):
-                for date in dates:
+            for chapter, data in list(exam.items()):
+                for info in data: # add more descriptive names
                     service.events().quickAdd(
                         calendarId='primary',
-                        text=f"{chapter} on {date=}").execute()
+                        text=f"{chapter}, page {info[1][0]} to pg. {info[1][1]}").execute()
                     time.sleep(1)
 
         for exam_num, date in enumerate(exam_dates):
             service.events().quickAdd(
                 calendarId='primary',
-                text=f"Exam {exam_num+1=} on {date=}").execute()
+                text=f"Exam {exam_num+1=} on {date}").execute()
             time.sleep(1)
+
+# main("clear", "", "")
